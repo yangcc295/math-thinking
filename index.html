@@ -1042,6 +1042,149 @@ const BANK = [
  p:'圆环面积 = π(R²−r²) = 3.14×(16−4) = 3.14×12 = 37.68 平方厘米。',
  tip:'圆环 = 大圆面积 − 小圆面积，用平方差更快。'}
 ];
+
+/* ===== 扩展题库：按知识点生成经过公式校验的变式题 ===== */
+const EXTRA_BANK=[];
+const addExtra=q=>EXTRA_BANK.push(q);
+const cleanNum=n=>String(Number(Number(n).toFixed(2)));
+const levels=['基础','进阶','挑战'];
+
+// 1. 分数百分数：求一个数的百分之几（24题）
+const percentRates=[10,20,25,40,50,75];
+for(let i=0;i<24;i++){
+  const base=40+i*20, rate=percentRates[i%percentRates.length], ans=base*rate/100;
+  addExtra({t:'fill',th:'转化思想',tp:'百分数应用',k:'分数百分数',lv:levels[i%3],
+    q:`${base} 的 ${rate}% 是（ ）。`,a:[cleanNum(ans)],u:'',
+    p:`把 ${rate}% 化成小数 ${rate/100}，${base}×${rate/100}=${cleanNum(ans)}。`,
+    tip:'求一个数的百分之几，用这个数乘对应的百分率。'});
+}
+
+// 2. 比例分配：按两数之比分配总量（20题）
+const ratioPairs=[[2,3],[3,5],[4,5],[5,7],[3,7]];
+for(let i=0;i<20;i++){
+  const [a,b]=ratioPairs[i%ratioPairs.length], unit=3+i, total=(a+b)*unit, ans=a*unit;
+  addExtra({t:'fill',th:'比例思想',tp:'按比分配',k:'比和比例',lv:levels[(i+1)%3],
+    q:`把 ${total} 按 ${a}∶${b} 分成两部分，较小的一部分是（ ）。`,a:[String(ans)],u:'',
+    p:`总份数是 ${a}+${b}=${a+b}，每份是 ${total}÷${a+b}=${unit}，较小部分是 ${unit}×${a}=${ans}。`,
+    tip:'先求总份数，再求每一份，最后乘对应份数。'});
+}
+
+// 3. 方程思想：ax+b=c（20题）
+for(let i=0;i<20;i++){
+  const x=5+i, coef=2+i%5, plus=3+i%7, total=coef*x+plus;
+  addExtra({t:'fill',th:'方程思想',tp:'解方程',k:'数与代数',lv:levels[i%3],
+    q:`解方程：${coef}x＋${plus}＝${total}，x＝（ ）。`,a:[String(x)],u:'',
+    p:`先移去加数：${total}−${plus}=${coef*x}，再除以 ${coef}，x=${coef*x}÷${coef}=${x}。`,
+    tip:'把含有 x 的部分看成一个整体，按运算的逆序求解。'});
+}
+
+// 4. 行程问题：路程=速度×时间（22题）
+for(let i=0;i<22;i++){
+  const speed=30+(i%8)*5, time=2+(i%5), distance=speed*time;
+  addExtra({t:'fill',th:'模型思想',tp:'行程问题',k:'行程工程',lv:levels[(i+2)%3],
+    q:`一辆车每小时行 ${speed} 千米，连续行驶 ${time} 小时，共行驶（ ）千米。`,a:[String(distance)],u:'千米',
+    p:`路程＝速度×时间，所以 ${speed}×${time}=${distance} 千米。`,
+    tip:'行程问题的基本模型：路程＝速度×时间。'});
+}
+
+// 5. 工程与周期：工作总量÷效率（15题）
+for(let i=0;i<15;i++){
+  const daily=12+i*2, days=3+i%7, total=daily*days;
+  addExtra({t:'fill',th:'模型思想',tp:'工程问题',k:'行程工程',lv:levels[i%3],
+    q:`一项任务共有 ${total} 个零件，每天完成 ${daily} 个，需要（ ）天完成。`,a:[String(days)],u:'天',
+    p:`工作时间＝工作总量÷工作效率，${total}÷${daily}=${days} 天。`,
+    tip:'工程问题中，总量、效率和时间三者可以互相求出。'});
+}
+
+// 6. 平面图形：长方形面积、周长与三角形面积（25题）
+for(let i=0;i<25;i++){
+  if(i%3===0){
+    const length=8+i, width=3+i%6, ans=length*width;
+    addExtra({t:'fill',th:'几何直观',tp:'长方形面积',k:'几何图形',lv:levels[i%3],
+      q:`一个长方形长 ${length} 厘米、宽 ${width} 厘米，面积是（ ）平方厘米。`,a:[String(ans)],u:'平方厘米',
+      p:`长方形面积＝长×宽，${length}×${width}=${ans} 平方厘米。`,tip:'把长和宽看成每行与行数，面积就是两者的乘积。'});
+  }else if(i%3===1){
+    const length=9+i, width=4+i%5, ans=2*(length+width);
+    addExtra({t:'fill',th:'几何直观',tp:'长方形周长',k:'几何图形',lv:levels[i%3],
+      q:`一个长方形长 ${length} 厘米、宽 ${width} 厘米，周长是（ ）厘米。`,a:[String(ans)],u:'厘米',
+      p:`长方形周长＝(长＋宽)×2，(${length}＋${width})×2=${ans} 厘米。`,tip:'周长是四条边的总长，可先算一组长与宽再乘2。'});
+  }else{
+    const base=8+2*i, height=3+i%7, ans=base*height/2;
+    addExtra({t:'fill',th:'转化思想',tp:'三角形面积',k:'几何图形',lv:levels[i%3],
+      q:`一个三角形底是 ${base} 厘米、高是 ${height} 厘米，面积是（ ）平方厘米。`,a:[cleanNum(ans)],u:'平方厘米',
+      p:`三角形面积＝底×高÷2，${base}×${height}÷2=${cleanNum(ans)} 平方厘米。`,tip:'两个完全相同的三角形可以拼成一个平行四边形。'});
+  }
+}
+
+// 7. 圆与圆柱：圆面积、圆周长、圆柱体积（20题）
+for(let i=0;i<20;i++){
+  if(i%3===0){
+    const r=2+i%7, ans=3.14*r*r;
+    addExtra({t:'fill',th:'几何直观',tp:'圆的面积',k:'几何图形',lv:levels[i%3],
+      q:`一个圆的半径是 ${r} 厘米，面积是（ ）平方厘米。（π取3.14）`,a:[cleanNum(ans)],u:'平方厘米',
+      p:`圆面积＝πr²＝3.14×${r}²＝${cleanNum(ans)} 平方厘米。`,tip:'半径先平方，再乘圆周率。'});
+  }else if(i%3===1){
+    const r=3+i%8, ans=2*3.14*r;
+    addExtra({t:'fill',th:'几何直观',tp:'圆的周长',k:'几何图形',lv:levels[i%3],
+      q:`一个圆的半径是 ${r} 厘米，周长是（ ）厘米。（π取3.14）`,a:[cleanNum(ans)],u:'厘米',
+      p:`圆周长＝2πr＝2×3.14×${r}＝${cleanNum(ans)} 厘米。`,tip:'已知半径求周长，用2πr。'});
+  }else{
+    const bottom=10+i, height=4+i%6, ans=bottom*height;
+    addExtra({t:'fill',th:'模型思想',tp:'圆柱的体积',k:'几何图形',lv:levels[i%3],
+      q:`一个圆柱底面积是 ${bottom} 平方厘米、高 ${height} 厘米，体积是（ ）立方厘米。`,a:[String(ans)],u:'立方厘米',
+      p:`圆柱体积＝底面积×高＝${bottom}×${height}＝${ans} 立方厘米。`,tip:'底面积已经给出时，直接乘高即可。'});
+  }
+}
+
+// 8. 鸡兔同笼：假设法（15题）
+for(let i=0;i<15;i++){
+  const heads=20+i, rabbits=5+i%10, chickens=heads-rabbits, feet=chickens*2+rabbits*4;
+  addExtra({t:'fill',th:'假设法',tp:'鸡兔同笼',k:'数学广角',lv:levels[(i+1)%3],
+    q:`鸡兔同笼，共有 ${heads} 个头、${feet} 只脚，兔有（ ）只。`,a:[String(rabbits)],u:'只',
+    p:`假设全是鸡，共有 ${heads*2} 只脚；多出的 ${feet-heads*2} 只脚，每只兔比鸡多2只脚，所以兔有 (${feet}−${heads*2})÷2=${rabbits} 只。`,
+    tip:'先假设全是鸡，再用实际脚数与假设脚数的差求兔数。'});
+}
+
+// 9. 鸽巢原理：至少数（10题）
+for(let i=0;i<10;i++){
+  const boxes=6+i, each=2+i%3, objects=boxes*each+1, ans=each+1;
+  addExtra({t:'fill',th:'鸽巢原理',tp:'抽屉原理',k:'数学广角',lv:levels[i%3],
+    q:`把 ${objects} 个球放进 ${boxes} 个盒子里，至少有一个盒子中有（ ）个球。`,a:[String(ans)],u:'个',
+    p:`${objects}÷${boxes}=${each} 余1，因此至少有一个盒子里有 ${each}+1=${ans} 个球。`,
+    tip:'有余数时，至少数等于商加1。'});
+}
+
+// 10. 平均数：由平均数求总数（10题）
+for(let i=0;i<10;i++){
+  const count=4+i%3, avg=15+i*2, total=count*avg;
+  addExtra({t:'fill',th:'转化思想',tp:'平均数问题',k:'综合应用',lv:levels[(i+2)%3],
+    q:`${count} 个数的平均数是 ${avg}，这 ${count} 个数的总和是（ ）。`,a:[String(total)],u:'',
+    p:`总数＝平均数×份数，${avg}×${count}=${total}。`,
+    tip:'平均数问题可在“平均数×个数”和“总数÷个数”之间转化。'});
+}
+
+// 每3道扩展题中取1道转成选择题，并自动生成不重复的数值干扰项。
+EXTRA_BANK.forEach((q,i)=>{
+  if(i%3!==0 || q.t!=='fill') return;
+  const correctText=q.a[0], correct=Number(correctText);
+  if(!Number.isFinite(correct)) return;
+  const step=Math.max(correct<10?1:Number((Math.abs(correct)*0.1).toFixed(correct%1?2:0)),0.01);
+  const distractors=[
+    cleanNum(correct+step),
+    cleanNum(Math.max(0,correct-step)),
+    cleanNum(correct+step*2)
+  ].filter((v,idx,arr)=>v!==correctText&&arr.indexOf(v)===idx);
+  while(distractors.length<3) distractors.push(cleanNum(correct+step*(distractors.length+3)));
+  const pos=(Math.floor(i/3))%4, values=distractors.slice(0,3);
+  values.splice(pos,0,correctText);
+  q.t='choice';
+  q.o=values.map((v,idx)=>`${'ABCD'[idx]}. ${v}`);
+  q.a='ABCD'[pos];
+  delete q.u;
+});
+
+// 当前基础题库119题，补充181题后恰好300题；未来基础题增加时自动只补到300题。
+BANK.push(...EXTRA_BANK.slice(0,Math.max(0,300-BANK.length)));
 BANK.forEach((q,i)=>q.id=i+1); // 为每题分配唯一 id（错题本/去重依赖）
 
 /* ===== 分级提示：id -> [一级:用什么方法, 二级:关键关系] ===== */
