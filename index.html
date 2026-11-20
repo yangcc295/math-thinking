@@ -1188,10 +1188,11 @@ function kpOf(q){
   if(/鸡兔|鸽巢|统筹|方阵|枚举|搭配|排列|找规律|烙饼|沏茶|打电话|找次品|对策|极值|广角/.test(t)) return '数学广角';
   return '数与代数';
 }
-const S = { thoughts:new Set(), kpoints:new Set(), level:'全部', count:10, list:[], i:0, correct:0, answers:[], timer:null, sec:0, answered:false, practiceWrong:false, extraIds:new Set() };
-let recentIds = []; // 最近出过的题目 id，用于换条件时降低重复率
+const S = { thoughts:new Set(), kpoints:new Set(), level:'全部', count:10, list:[], i:0, correct:0, answers:[], timer:null, sec:0, answered:false, practiceWrong:false, extraIds:new Set(), repeatFallbackCount:0 };
 const $ = id => document.getElementById(id);
 const WRONG_KEY = 'math6_wrongbook_v1';
+const HISTORY_KEY = 'math6_question_history_v1';
+const DAY_MS = 24*60*60*1000;
 
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
 function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
@@ -1204,6 +1205,57 @@ function norm(s){
 }
 function getWrong(){ try{return JSON.parse(localStorage.getItem(WRONG_KEY)||'[]').filter(w=>w&&w.id);}catch(e){return [];} }
 function saveWrong(a){ try{ localStorage.setItem(WRONG_KEY,JSON.stringify(a)); }catch(e){ toast('当前浏览器禁用了本地存储，错题本次不保存'); } updateWrongCount(); }
+function getHistory(){ try{const h=JSON.parse(localStorage.getItem(HISTORY_KEY)||'{}'); return h&&typeof h==='object'?h:{};}catch(e){return {};} }
+function saveHistory(h){ try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h));}catch(e){toast('当前浏览器禁用了本地存储，学习记录本次不保存');} }
+function markSeen(q){
+  const h=getHistory(), now=Date.now(), r=h[q.id]||{};
+  r.lastSeen=now;
+  // 只浏览到题目但尚未作答时，也先避免短期内反复抽到
+  // 已进入错题复习周期的题仍保持到期状态，避免中途退出后被推迟10天
+  if(!Number.isInteger(r.reviewStep) && (!r.nextDue || r.nextDue<now)) r.nextDue=now+10*DAY_MS;
+  h[q.id]=r; saveHistory(h);
+}
+function recordHistory(q,isRight){
+  const h=getHistory(), now=Date.now(), r=h[q.id]||{};
+  r.lastSeen=now; r.lastAnswered=now; r.lastResult=isRight?'right':'wrong';
+  if(!isRight){
+    r.correctStreak=0;
+    r.reviewStep=0;
+    r.wrongCount=(r.wrongCount||0)+1;
+    r.nextDue=now+DAY_MS;
+  }else if(Number.isInteger(r.reviewStep)){
+    // 错题按 1天（答错后）→3天→7天复习；完成三次后视为重新掌握
+    if(r.reviewStep===0){ r.reviewStep=1; r.nextDue=now+3*DAY_MS; }
+    else if(r.reviewStep===1){ r.reviewStep=2; r.nextDue=now+7*DAY_MS; }
+    else{
+      delete r.reviewStep;
+      r.correctStreak=1;
+      r.nextDue=now+15*DAY_MS;
+      saveWrong(getWrong().filter(w=>w.id!==q.id));
+    }
+  }else{
+    r.correctStreak=(r.correctStreak||0)+1;
+    const days=r.correctStreak>=3?30:r.correctStreak===2?15:10;
+    r.nextDue=now+days*DAY_MS;
+  }
+  h[q.id]=r; saveHistory(h);
+}
+function orderedCandidates(pool,allowRecent){
+  const h=getHistory(), now=Date.now();
+  if(allowRecent) return shuffle(pool.slice());
+  const dueReview=[], unseen=[], dueNormal=[], cooling=[];
+  pool.forEach(q=>{
+    const r=h[q.id];
+    if(!r){ unseen.push(q); return; }
+    if((r.nextDue||0)<=now){
+      (Number.isInteger(r.reviewStep)?dueReview:dueNormal).push(q);
+    }else cooling.push(q);
+  });
+  shuffle(dueReview); shuffle(unseen); shuffle(dueNormal);
+  // 冷却中的题仅在题量不足时启用，优先选距离上次出现最久的
+  cooling.sort((a,b)=>(h[a.id].lastSeen||0)-(h[b.id].lastSeen||0));
+  return dueReview.concat(unseen,dueNormal,cooling);
+}
 function updateWrongCount(){
   const n=getWrong().length;
   $('wrongCount').textContent = n? '('+n+')' : '';
@@ -1258,26 +1310,25 @@ function startQuiz(useWrong){
   }
   if(!pool.length){ toast('该条件下暂无题目，请放宽筛选'); return; }
   const need = S.count; // 目标题量始终等于所选值
-  // 优先抽最近没出过的题，降低换思想类型后的重复率
-  const avoid = new Set(recentIds);
-  const fresh = pool.filter(q=>!avoid.has(q.id));
-  const stale = pool.filter(q=>avoid.has(q.id));
-  shuffle(fresh); shuffle(stale);
-  let picked = fresh.slice(0,need);
-  if(picked.length<need) picked = picked.concat(stale.slice(0,need-picked.length));
+  // 普通练习优先使用到期错题、从未出现题和已过冷却期题；
+  // 错题专项不受冷却限制。题量不足时才使用最久未出现的冷却题。
+  const historyBefore=getHistory(), now=Date.now();
+  const ordered=orderedCandidates(pool,!!useWrong);
+  let picked=ordered.slice(0,need);
+  S.repeatFallbackCount=useWrong?0:picked.filter(q=>{
+    const r=historyBefore[q.id]; return r&&r.nextDue>now;
+  }).length;
   // 不足部分用其他思想类型的题补足，并标记为"拓展题"
   S.extraIds = new Set();
   if(picked.length<need && extraPool.length){
-    const ef = extraPool.filter(q=>!avoid.has(q.id));
-    const es = extraPool.filter(q=>avoid.has(q.id));
-    shuffle(ef); shuffle(es);
-    const extras = ef.concat(es).slice(0, need-picked.length);
+    const extras = orderedCandidates(extraPool,false).slice(0, need-picked.length);
     extras.forEach(q=>S.extraIds.add(q.id));
+    S.repeatFallbackCount+=extras.filter(q=>{
+      const r=historyBefore[q.id]; return r&&r.nextDue>now;
+    }).length;
     picked = picked.concat(extras);
   }
   S.list = picked;
-  // 记录本次题目（保留最近两轮，最多不超过题库一半）
-  recentIds = S.list.map(q=>q.id).concat(recentIds).slice(0, Math.min(S.count*2, Math.floor(BANK.length/2)));
   S.i=0; S.correct=0; S.answers=[]; S.sec=0; S.practiceWrong=!!useWrong; S.viewedCount=0;
   if(S.practiceWrong){ $('wrongModal').classList.remove('show'); $('btnPracticeWrong').style.display='none'; }
   else $('btnPracticeWrong').style.display='';
@@ -1287,6 +1338,7 @@ function startTimer(){ clearInterval(S.timer); S.timer=setInterval(()=>{S.sec++;
 
 function renderQuestion(){
   const q=S.list[S.i]; S.answered=false;
+  markSeen(q);
   $('qProgress').textContent=`第 ${S.i+1} / ${S.list.length} 题`;
   $('qScore').textContent=S.correct;
   $('qTime').textContent=fmt(S.sec);
@@ -1338,6 +1390,9 @@ function viewSolution(){
   if(S.answered) return;
   const q=S.list[S.i];
   S.viewedSolution=true; S.answered=true; S.viewedCount++; clearInterval(S.timer);
+  recordHistory(q,false);
+  const wb=getWrong();
+  if(!wb.some(w=>w.id===q.id)){ wb.push({id:q.id,q:q.q,a:q.t==='choice'?q.a:q.a[0],th:q.th}); saveWrong(wb); }
   $('qBar').style.width=((S.i+1)/S.list.length*100)+'%';
   const fb=$('feedback');
   fb.className='feedback show ok';
@@ -1366,6 +1421,7 @@ function submitAnswer(){
   }
   S.answered=true; clearInterval(S.timer);
   S.answers.push({q,val,right:isRight});
+  recordHistory(q,isRight);
   if(isRight) S.correct++;
   else{
     const wb=getWrong();
@@ -1408,7 +1464,7 @@ function showResult(){
   $('resCorrect').textContent=S.correct;
   $('resRate').textContent=rate+'%';
   $('resComment').textContent = rate>=90?'太棒了，思维很清晰！':rate>=70?'不错，继续加油！':rate>=50?'有进步空间，看看解析':'别灰心，错题是最好的老师';
-  $('resSub').textContent = (S.practiceWrong?'错题重练完成':'完成 '+total+' 道思维题') + (S.viewedCount?' · '+S.viewedCount+' 道看了解答（不计分）':'') + (S.extraIds.size?' · 含 '+S.extraIds.size+' 道拓展题':'');
+  $('resSub').textContent = (S.practiceWrong?'错题重练完成':'完成 '+total+' 道思维题') + (S.viewedCount?' · '+S.viewedCount+' 道看了解答（不计分）':'') + (S.extraIds.size?' · 含 '+S.extraIds.size+' 道拓展题':'') + (S.repeatFallbackCount?' · 题量不足，复用了 '+S.repeatFallbackCount+' 道近期题':'');
 
   // 各思想掌握度
   const m={};
